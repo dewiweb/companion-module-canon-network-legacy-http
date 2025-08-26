@@ -1,0 +1,34 @@
+# Node
+node_modules/
+.npmrc
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Builds / dist
+/dist/
+/build/
+/.cache/
+/.parcel-cache/
+coverage/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Companion module artifacts (if any in local workflows)
+/tmp/
+*.local.*
+
+# Lockfiles (keep yarn.lock, ignore npm lock)
+package-lock.json
+pnpm-lock.yaml

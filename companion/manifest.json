@@ -16,6 +16,6 @@
     "entrypoint": "../src/index.js"
   },
   "manufacturer": "Canon",
-  "products": ["VB-H41"],
+  "products": ["VB-H41", "VB-H730F"],
   "keywords": ["canon", "network", "legacy", "http", "camera", "ptz"]
 }
