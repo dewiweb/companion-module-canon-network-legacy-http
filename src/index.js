@@ -81,6 +81,7 @@ class CanonLegacyHttpInstance extends InstanceBase {
 		this.capabilities = {
 			supportsPTZ: !!series?.supportsPTZ,
 			supportsZoom: !!series?.supportsZoom,
+			supportsNativePresets: !!series?.supportsNativePresets,
 			posPresetsPTZF: !!series?.posPresetsPTZF,
 		}
 	}

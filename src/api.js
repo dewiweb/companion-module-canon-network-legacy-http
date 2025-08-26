@@ -14,6 +14,64 @@ class API {
 		this._nc = 0
 	}
 
+	async sendPost(cmd, body) {
+		// Support absolute URLs, absolute paths, or relative (to WebView base)
+		let requestUrl
+		if (typeof cmd === 'string' && (cmd.startsWith('http://') || cmd.startsWith('https://'))) {
+			requestUrl = cmd
+		} else if (typeof cmd === 'string' && cmd.startsWith('/')) {
+			requestUrl = this.rootUrl.replace(/\/$/, '') + cmd
+		} else {
+			requestUrl = this.baseUrl + cmd
+		}
+		const data = typeof body === 'string' ? body : ''
+		try {
+			const axiosConfig = {
+				timeout: this.timeout,
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			}
+			if (this.username || this.password) {
+				axiosConfig.auth = { username: this.username, password: this.password }
+			}
+			if (this.verbose) {
+				console.log(`[Canon Legacy HTTP] POST ${requestUrl} <- ${data}`)
+			}
+			const response = await axios.post(requestUrl, data, axiosConfig)
+			return { status: 'ok', response }
+		} catch (err) {
+			// Retry with Digest if required
+			const res = err?.response
+			const www = res?.headers?.['www-authenticate'] || res?.headers?.['WWW-Authenticate']
+			const needsDigest = res?.status === 401 && typeof www === 'string' && www.toLowerCase().startsWith('digest')
+			if (needsDigest && (this.username || this.password)) {
+				try {
+					const method = 'POST'
+					const urlObj = new URL(requestUrl)
+					const uri = urlObj.pathname + (urlObj.search || '')
+					const authHeader = this._buildDigestHeader(www, method, uri)
+					const axiosConfig2 = {
+						timeout: this.timeout,
+						headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: authHeader },
+					}
+					if (this.verbose) {
+						console.log('[Canon Legacy HTTP] Retrying POST with Digest auth')
+					}
+					const response2 = await axios.post(requestUrl, data, axiosConfig2)
+					return { status: 'ok', response: response2 }
+				} catch (err2) {
+					if (this.verbose) {
+						console.warn(`[Canon Legacy HTTP] Digest POST retry failed for ${requestUrl}: ${err2?.message || err2}`)
+					}
+					return { status: 'failed', error: err2 }
+				}
+			}
+			if (this.verbose) {
+				console.warn(`[Canon Legacy HTTP] POST failed for ${requestUrl}: ${err?.message || err}`)
+			}
+			return { status: 'failed', error: err }
+		}
+	}
+
 	async sendRequest(cmd) {
 		// Support absolute URLs, absolute paths, or relative (to WebView base)
 		let requestUrl

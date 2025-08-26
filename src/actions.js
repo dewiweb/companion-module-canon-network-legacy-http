@@ -725,6 +725,8 @@ module.exports = function (self) {
             ],
             callback: async (event) => {
                 const slot = parseInt(event.options?.slot) || 1
+                // Settings protocol (eaXX-<index>) uses 0-based indices, while info.cgi reports 1-based (p.1..p.20)
+                const slot0 = Math.max(0, (slot | 0) - 1)
                 const name = (event.options?.name || '').trim() || `preset_${slot}`
                 try {
                     if (typeof self.getCameraInformation === 'function') {
@@ -743,6 +745,8 @@ module.exports = function (self) {
                 const zoom = getC('zoom')
                 const aeB = getC('ae.brightness')
                 const shadeParam = getC('shade.param')
+                const focusMode = getC('focus')
+                const focusValue = getC('focus.value')
 
                 const toFixed2 = (n) => {
                     if (n === '') return ''
@@ -757,36 +761,46 @@ module.exports = function (self) {
                 const shadeParamSettings = shadeParam === '' ? '' : String(Number(shadeParam) + 1)
 
                 const tx = []
-                tx.push(`ea00-${slot}=1`)
-                tx.push(`ea01-${slot}=${encodeURIComponent(name)}`)
-                if (panFx) tx.push(`ea04-${slot}=${panFx}`)
-                if (tiltFx) tx.push(`ea05-${slot}=${tiltFx}`)
-                if (zoomFx) tx.push(`ea06-${slot}=${zoomFx}`)
-                if (aeSettings !== '') tx.push(`ea07-${slot}=${aeSettings}`)
-                if (shadeParamSettings !== '') tx.push(`ea12-${slot}=${shadeParamSettings}`)
+                tx.push(`ea00-${slot0}=1`)
+                // Write both ASCII and UTF-8 names to keep fields in sync
+                tx.push(`ea01-${slot0}=${encodeURIComponent(name)}`)
+                tx.push(`ea02-${slot0}=${encodeURIComponent(name)}`)
+                if (panFx) tx.push(`ea04-${slot0}=${panFx}`)
+                if (tiltFx) tx.push(`ea05-${slot0}=${tiltFx}`)
+                if (zoomFx) tx.push(`ea06-${slot0}=${zoomFx}`)
+                if (aeSettings !== '') tx.push(`ea07-${slot0}=${aeSettings}`)
+                if (shadeParamSettings !== '') tx.push(`ea12-${slot0}=${shadeParamSettings}`)
+                // If current focus is manual and we have a numeric value, persist it in the preset (settings protocol uses ea10 for manual focus value)
+                if (focusMode === 'manual' && focusValue !== '') {
+                    tx.push(`ea10-${slot0}=${focusValue}`)
+                }
 
                 const txStr = tx.join('&')
-                if (self.config?.verbose) self.log?.('info', `Native preset save ${slot} WRITE -> ${txStr}`)
-                await self.sendPTZ('/admin/-set-?', txStr)
-                if (self.config?.verbose) self.log?.('info', `Native preset save ${slot} SAVE -> pt=4`)
-                await self.sendPTZ('/admin/-set-?', 'pt=4')
-                self.getCameraInformation_Delayed?.(800)
+                if (self.config?.verbose) self.log?.('info', `Native preset save ${slot} (ea index ${slot0}) WRITE -> ${txStr}`)
+                const api = new API(self.config)
+                // Use GET for settings protocol; some devices ignore POST bodies on /admin/-set-?
+                await api.sendRequest('/admin/-set-?' + txStr)
+                if (self.config?.verbose) self.log?.('info', `Native preset save ${slot} (ea index ${slot0}) SAVE -> pt=4`)
+                // Commit via admin settings endpoint; add small retry/backoff for transient C006
+                const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+                let ok = false
+                for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+                    const commit = await api.sendRequest('/admin/-set-?pt=4')
+                    const body = commit?.response?.data ? String(commit.response.data) : ''
+                    if (commit?.status === 'ok' && /Status=0/.test(body)) {
+                        ok = true
+                        break
+                    }
+                    if (self.config?.verbose) {
+                        const msg = body && body.length < 200 ? body.replace(/\s+/g, ' ') : commit?.status
+                        self.log?.('warn', `Commit pt=4 attempt ${attempt + 1} not OK: ${msg}`)
+                    }
+                    await sleep([200, 400, 800][attempt] || 400)
+                }
+                // Allow more time for info.cgi to reflect the new preset values
+                self.getCameraInformation_Delayed?.(1500)
             },
         },
-    }
-
-    // Filter actions based on capabilities
-    if (!supportsPTZ) {
-        const ptKeys = Object.keys(actions).filter((k) => k.startsWith('pt_') || k.startsWith('ptzf_'))
-        for (const k of ptKeys) delete actions[k]
-    }
-    if (!supportsZoom) {
-        const zKeys = ['zoom_in', 'zoom_out', 'zoom_stop']
-        for (const k of zKeys) delete actions[k]
-    }
-    if (!supportsPTZFPosPresets) {
-        const pKeys = ['posPresetSave', 'posPresetRecall']
-        for (const k of pKeys) delete actions[k]
     }
 
     // Hide native preset actions if PTZ not supported at all or native presets unsupported
