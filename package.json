@@ -1,0 +1,12 @@
+{
+  "name": "companion-module-canon-network-legacy-http",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Companion module for Canon legacy network cameras using the webview HTTP interface",
+  "main": "src/index.js",
+  "dependencies": {
+    "@companion-module/base": "^1.11.0",
+    "axios": "^1.7.0"
+  }
+}

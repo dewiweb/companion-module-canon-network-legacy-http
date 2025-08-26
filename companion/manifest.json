@@ -1,0 +1,21 @@
+{
+  "id": "canon-network-legacy-http",
+  "name": "Canon Network (Legacy HTTP)",
+  "shortname": "canon-network-legacy",
+  "description": "Companion module for Canon legacy network cameras using the webview HTTP interface (e.g., VB-H41)",
+  "version": "0.1.0",
+  "license": "MIT",
+  "repository": "",
+  "bugs": "",
+  "maintainers": [],
+  "legacyIds": [],
+  "runtime": {
+    "type": "node18",
+    "api": "nodejs-ipc",
+    "apiVersion": "1.11.0",
+    "entrypoint": "../src/index.js"
+  },
+  "manufacturer": "Canon",
+  "products": ["VB-H41"],
+  "keywords": ["canon", "network", "legacy", "http", "camera", "ptz"]
+}
